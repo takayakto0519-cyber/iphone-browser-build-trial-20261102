@@ -25,6 +25,7 @@ jobs:
         run: bash build-unsigned.sh "$RUNNER_TEMP/prepared" "$RUNNER_TEMP/result"
       - name: Real WebKit synthetic test (macOS, not iPhone)
         run: |
+          set -euo pipefail
           export DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer
           python3 test-webkit.py "$RUNNER_TEMP/prepared/app/apps/ios/IPhoneUseRemote/Sources" "$RUNNER_TEMP/webkit" | tee "$RUNNER_TEMP/result/webkit-results.txt"
       - name: Save unsigned package to an owner-only draft release
