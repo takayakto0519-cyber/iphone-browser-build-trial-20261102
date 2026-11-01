@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<title>BROWSER-LOCAL-FIXTURE</title><style>body{font:22px system-ui;padding:20px}input{font:22px system-ui;width:90%}#status{position:fixed;bottom:0;background:white}</style>
+<h1>BROWSER-LOCAL-FIXTURE</h1><p>Dummy page. No account, application or submission.</p>
+<div style="position:sticky;top:0;background:white"><label for="dummy">Dummy input</label><input id="dummy" type="text" maxlength="40" aria-label="Dummy input"></div>
+<div style="height:2200px">Scroll fixture</div><p>END OF TEST</p><p id="status">WAITING</p>
+<script>window.addEventListener('scroll',()=>{document.getElementById('status').textContent=window.scrollY>0?'SCROLLED':'TOP';});</script></html>

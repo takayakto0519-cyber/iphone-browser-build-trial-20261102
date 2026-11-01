@@ -1,0 +1,12 @@
+{
+  "repository": "leeguooooo/iphone-use",
+  "release": "v0.27.31",
+  "sourceCommit": "5ff202427d6837532054ce28a045fcc7f6696263",
+  "url": "https://github.com/leeguooooo/iphone-use/releases/download/v0.27.31/iphone-use-app.tar.gz",
+  "sha256": "f69317ad28a8661ae0900c9442667bf0946d2fb337c444e54ef657e788a2088e",
+  "size": 24446037,
+  "variant": "remote-only",
+  "runtime": "iPhone in-app WKWebView; separate from Safari",
+  "requiresNativeBuild": true,
+  "appleAccountUploadedToBuild": false
+}
