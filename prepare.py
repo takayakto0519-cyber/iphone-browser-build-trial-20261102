@@ -103,11 +103,65 @@ private final class ValidationNoModelNetwork: URLProtocol, @unchecked Sendable {
         }
 ''')
     p.write_text(s,encoding='utf-8')
+    harden_and_add_local_ai(source)
     (destination/'PREPARED.json').write_text(json.dumps({'release':LOCK['release'],'sha256':LOCK['sha256'],
         'variant':'remote-only','safetyOverlay':'no automated click/select/site/profile; one-use 15s input snapshot; no overwrite; maxlength',
         'cloudModelNetworkBlocked':True,'fixtureGoal':'LOCAL_FIXTURE','fixtureAddress':'local-test',
         'modelCallsExecuted':False,'nativeBuildExecuted':False,'installed':False},indent=2),encoding='utf-8')
     return source
+
+def harden_and_add_local_ai(source):
+    p=source/'BrowserAgent.swift'; s=p.read_text(encoding='utf-8')
+    s=replace_once(s,'guard !configured.isEmpty || text == "LOCAL_FIXTURE" else {',
+                   'guard !configured.isEmpty || text == "LOCAL_FIXTURE" || text.hasPrefix("LOCAL_AI:") else {')
+    s=replace_once(s,'            let engine: any BrowserReasoning = goal == "LOCAL_FIXTURE" ? ValidationFixtureReasoning() : reasoning', '''            let engine: any BrowserReasoning
+            if goal == "LOCAL_FIXTURE" {
+                engine = ValidationFixtureReasoning()
+                try await browser.waitUntilReady()
+                let image = try await browser.webView.takeSnapshot(with: nil)
+                try check(id)
+                guard image.size.width > 0, image.size.height > 0 else { throw BrowserToolError.invalidResult }
+                steps.append(.init(text: "MOCK: 画面をメモリ内で取得（ファイル保存なし）", action: "screen"))
+            } else if goal.hasPrefix("LOCAL_AI:") {
+                #if canImport(FoundationModels)
+                if #available(iOS 26.0, *) { engine = LocalBrowserReasoning() }
+                else { throw BrowserToolError.actionFailed("端末内AIにはiOS 26以降が必要です") }
+                #else
+                throw BrowserToolError.actionFailed("このビルドは端末内AIを利用できません")
+                #endif
+            } else { throw BrowserToolError.actionFailed("この検証版はLOCAL_FIXTUREまたはLOCAL_AI:を使ってください。外部AIは無効です。") }''')
+    # Never extract browser cookies into a model context, including locally.
+    start=s.index('                if let client = reasoning as? BrowserModelClient, let library {')
+    end=s.index('                let decision = try await engine.decide',start)
+    s=s[:start]+s[end:]
+    s=replace_once(s,'                    try await apply(decision, page: page)', '''                    guard let observed = page else { throw BrowserToolError.invalidResult }
+                    let latest = try await browser.readPage()
+                    try check(id)
+                    let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+                    guard latest.url == observed.url, latest.title == observed.title, latest.text == observed.text,
+                          try encoder.encode(latest.elements) == encoder.encode(observed.elements) else { throw BrowserToolError.stalePage }
+                    try await apply(decision, page: latest)''')
+    s=replace_once(s,'                    guard staleRetries <= 3 else { throw BrowserToolError.stalePage }',
+                   '                    throw BrowserToolError.stalePage // Stop; never automatically resend after a stale/unknown result.')
+    s+='\n'+(ROOT/'LocalBrowserReasoning.swift').read_text(encoding='utf-8')
+    p.write_text(s,encoding='utf-8')
+    # An ephemeral browser: no cookie/storage export, import, automatic history or goal draft persistence.
+    p=source/'BrowserTaskViews.swift'; s=p.read_text(encoding='utf-8')
+    def replace_function(text, signature, body):
+        begin=text.index(signature); opening=text.index('{',begin); depth=1; end=opening+1
+        # Only used for fixed, audited upstream functions with balanced literal braces.
+        while depth:
+            if text[end]=='{': depth+=1
+            elif text[end]=='}': depth-=1
+            end+=1
+        return text[:opening+1]+'\n'+body+'\n    '+text[end-1:]
+    s=replace_function(s,'    private static func store(for id: UUID)', '        return .nonPersistent()')
+    s=replace_function(s,'    private func bindVisits()', '        // No cookie observer, automatic history or storage capture in this build.')
+    s=replace_function(s,'    func cookiesDidChange(in cookieStore:', '        // Cookie export disabled.')
+    s=replace_function(s,'    func capture() async', '        // No cookies, localStorage, private screens or page text are saved.')
+    s=replace_function(s,'    func restore() async', '        // Session import and automatic reopening disabled.')
+    s=replace_once(s,'@AppStorage("browser.goalDraft.v1") private var draft = ""', '@State private var draft = ""')
+    p.write_text(s,encoding='utf-8')
 
 if __name__=='__main__':
     a=argparse.ArgumentParser();a.add_argument('archive');a.add_argument('--output',required=True);args=a.parse_args()

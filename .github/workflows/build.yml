@@ -23,6 +23,10 @@ jobs:
           python3 prepare.py "$RUNNER_TEMP/upstream.tar.gz" --output "$RUNNER_TEMP/prepared"
       - name: Build only; no Apple identity or signing secrets
         run: bash build-unsigned.sh "$RUNNER_TEMP/prepared" "$RUNNER_TEMP/result"
+      - name: Real WebKit synthetic test (macOS, not iPhone)
+        run: |
+          export DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer
+          python3 test-webkit.py "$RUNNER_TEMP/prepared/app/apps/ios/IPhoneUseRemote/Sources" "$RUNNER_TEMP/webkit" | tee "$RUNNER_TEMP/result/webkit-results.txt"
       - name: Save unsigned package to an owner-only draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -32,4 +36,5 @@ jobs:
             --notes 'Unsigned source build. No Apple credentials used. Native tests and iPhone installation not yet verified. Original upstream license applies.' \
             "$RUNNER_TEMP/result/browser-trial-UNSIGNED.ipa" \
             "$RUNNER_TEMP/result/browser-trial-UNSIGNED.ipa.sha256" \
-            "$RUNNER_TEMP/result/build-environment.txt"
+            "$RUNNER_TEMP/result/build-environment.txt" \
+            "$RUNNER_TEMP/result/webkit-results.txt"

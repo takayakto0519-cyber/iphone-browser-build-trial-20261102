@@ -14,7 +14,7 @@ xcodebuild -project "$input_dir/app/apps/ios/PhoneUseRemoteOnly.xcodeproj" \
   -destination 'generic/platform=iOS' -derivedDataPath "$output_dir/derived" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= \
   IPU_APP_BUNDLE_ID=local.owner.browsertrial DEVELOPMENT_TEAM= \
-  build > "$output_dir/build.log" 2>&1
+  build > "$output_dir/build.log" 2>&1 || { tail -n 100 "$output_dir/build.log"; exit 1; }
 app="$output_dir/derived/Build/Products/Release-iphoneos/Phone Use Remote.app"
 test -d "$app"
 mkdir "$output_dir/Payload"
