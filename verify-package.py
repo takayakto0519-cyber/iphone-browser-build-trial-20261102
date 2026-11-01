@@ -8,6 +8,7 @@ header=(app/info['CFBundleExecutable']).read_bytes()[:8]
 if len(header)!=8 or header[:4]!=b'\xcf\xfa\xed\xfe' or struct.unpack('<I',header[4:])[0]!=0x0100000c:
     raise SystemExit('Expected a real arm64 Mach-O executable')
 if any(app.rglob('*.xctest')): raise SystemExit('Native device-control runner unexpectedly present')
+if any(app.rglob('*.appex')): raise SystemExit('Browser-only package must not contain extensions')
 for p in app.rglob('Info.plist'):
     data=plistlib.loads(p.read_bytes())
     if data.get('NSExtension',{}).get('NSExtensionPointIdentifier')=='com.apple.networkextension.packet-tunnel':

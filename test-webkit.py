@@ -36,8 +36,14 @@ __FIXTURE_HTML__
         try require(first["title"] as? String == "BROWSER-LOCAL-FIXTURE","Wrong fixture title")
         // WKWebView baseURL semantics must be measured, not assumed.
         try require((first["url"] as? String)?.hasPrefix("https://fixture.invalid/") == true,"Unexpected loadHTMLString URL: \(first["url"] ?? "nil")")
-        let image = try await web.takeSnapshot(with:nil)
-        try require(image.size.width > 0 && image.size.height > 0,"Empty screenshot")
+        let size: NSSize = try await withCheckedThrowingContinuation { continuation in
+            web.takeSnapshot(with:nil) { image, error in
+                if let error { continuation.resume(throwing:error) }
+                else if let image { continuation.resume(returning:image.size) }
+                else { continuation.resume(throwing:NSError(domain:"EmptyScreenshot",code:1)) }
+            }
+        }
+        try require(size.width > 0 && size.height > 0,"Empty screenshot")
         let elements = first["elements"] as! [[String: Any]]
         let field = elements.first { $0["label"] as? String == "Dummy input" }!
         let id = field["id"] as! Int

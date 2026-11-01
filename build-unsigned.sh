@@ -19,6 +19,7 @@ app="$output_dir/derived/Build/Products/Release-iphoneos/Phone Use Remote.app"
 test -d "$app"
 mkdir "$output_dir/Payload"
 ditto "$app" "$output_dir/Payload/Phone Use Remote.app"
+python3 "$kit_dir/prepare-package.py" "$output_dir/Payload/Phone Use Remote.app"
 python3 "$kit_dir/verify-package.py" "$output_dir/Payload/Phone Use Remote.app"
 (cd "$output_dir" && /usr/bin/zip -qr browser-trial-UNSIGNED.ipa Payload)
 (cd "$output_dir" && shasum -a 256 browser-trial-UNSIGNED.ipa > browser-trial-UNSIGNED.ipa.sha256)

@@ -1,7 +1,7 @@
 """Verify the public release, extract to a NEW directory, and apply a test-only safety overlay.
 No install, signing, pairing, certificate creation or model calls.
 """
-import argparse, hashlib, json, tarfile
+import argparse, hashlib, json, tarfile, plistlib
 from pathlib import Path, PurePosixPath
 
 ROOT=Path(__file__).resolve().parent
@@ -111,6 +111,8 @@ private final class ValidationNoModelNetwork: URLProtocol, @unchecked Sendable {
     return source
 
 def harden_and_add_local_ai(source):
+    # No cross-app Keychain sharing is needed for the on-device browser trial.
+    (source.parent/'Remote.entitlements').write_bytes(plistlib.dumps({}))
     p=source/'BrowserAgent.swift'; s=p.read_text(encoding='utf-8')
     s=replace_once(s,'guard !configured.isEmpty || text == "LOCAL_FIXTURE" else {',
                    'guard !configured.isEmpty || text == "LOCAL_FIXTURE" || text.hasPrefix("LOCAL_AI:") else {')
@@ -118,9 +120,15 @@ def harden_and_add_local_ai(source):
             if goal == "LOCAL_FIXTURE" {
                 engine = ValidationFixtureReasoning()
                 try await browser.waitUntilReady()
-                let image = try await browser.webView.takeSnapshot(with: nil)
+                let size: CGSize = try await withCheckedThrowingContinuation { continuation in
+                    browser.webView.takeSnapshot(with: nil) { image, error in
+                        if let error { continuation.resume(throwing: error) }
+                        else if let image { continuation.resume(returning: image.size) }
+                        else { continuation.resume(throwing: BrowserToolError.invalidResult) }
+                    }
+                }
                 try check(id)
-                guard image.size.width > 0, image.size.height > 0 else { throw BrowserToolError.invalidResult }
+                guard size.width > 0, size.height > 0 else { throw BrowserToolError.invalidResult }
                 steps.append(.init(text: "MOCK: 画面をメモリ内で取得（ファイル保存なし）", action: "screen"))
             } else if goal.hasPrefix("LOCAL_AI:") {
                 #if canImport(FoundationModels)
