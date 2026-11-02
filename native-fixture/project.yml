@@ -1,0 +1,39 @@
+name: NativeFixture
+options:
+  bundleIdPrefix: org.example
+  deploymentTarget:
+    iOS: '26.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGNING_REQUIRED: NO
+    GENERATE_INFOPLIST_FILE: YES
+targets:
+  NativeFixture:
+    type: application
+    platform: iOS
+    sources: [NativeFixture.swift]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.example.NativeAgentFixture
+        INFOPLIST_KEY_CFBundleDisplayName: Native Fixture
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+  NativeFixtureUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [NativeFixtureUITests.swift]
+    dependencies:
+      - target: NativeFixture
+    settings:
+      base:
+        TEST_TARGET_NAME: NativeFixture
+schemes:
+  NativeFixture:
+    build:
+      targets:
+        NativeFixture: all
+        NativeFixtureUITests: [test]
+    test:
+      targets: [NativeFixtureUITests]

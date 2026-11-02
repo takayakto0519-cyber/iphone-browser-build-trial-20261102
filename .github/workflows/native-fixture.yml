@@ -1,0 +1,48 @@
+name: Native fixture simulator validation (not a real iPhone)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-fixture-validation
+  cancel-in-progress: false
+jobs:
+  test:
+    if: ${{ github.event.repository.private == false }}
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Locked Xcode and locked official XcodeGen binary
+        run: |
+          set -euo pipefail
+          test -d /Applications/Xcode_26.6.app
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip \
+            --output "$RUNNER_TEMP/xcodegen.zip"
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          ditto -x -k "$RUNNER_TEMP/xcodegen.zip" "$RUNNER_TEMP/xcodegen"
+          gen="$(find "$RUNNER_TEMP/xcodegen" -type f -name xcodegen | head -n 1)"
+          test -n "$gen"
+          chmod +x "$gen"
+          "$gen" --version
+          "$gen" generate --spec native-fixture/project.yml --project native-fixture
+      - name: Build and execute native synthetic UI tests on iOS Simulator
+        run: |
+          set -euo pipefail
+          export DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer
+          xcodebuild -version
+          simulator="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for k,vs in d["devices"].items() if "iOS" in k for v in vs if "iPhone" in v["name"]))')"
+          xcodebuild -project native-fixture/NativeFixture.xcodeproj -scheme NativeFixture \
+            -destination "platform=iOS Simulator,id=$simulator" \
+            -derivedDataPath "$RUNNER_TEMP/native-derived" \
+            -resultBundlePath "$RUNNER_TEMP/native-results.xcresult" \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            test > "$RUNNER_TEMP/native-build.log" 2>&1 || {
+              tail -n 100 "$RUNNER_TEMP/native-build.log"
+              exit 1
+            }
+          tail -n 35 "$RUNNER_TEMP/native-build.log"
+          echo 'SIMULATOR ONLY: no physical iPhone, no Codex MCP, and no dot connection tested.'
