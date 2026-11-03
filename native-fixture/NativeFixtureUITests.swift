@@ -6,6 +6,8 @@ final class NativeFixtureUITests: XCTestCase {
         let fixture = XCUIApplication()
         fixture.launch()
         XCTAssertTrue(fixture.staticTexts["fixture.marker"].waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(fixture.screenshot().pngRepresentation.count, 0)
+        print("Synthetic native screenshot captured in memory.")
         let field = fixture.textFields["fixture.input"]
         field.tap()
         field.typeText("日本語ダミー123")
@@ -17,6 +19,7 @@ final class NativeFixtureUITests: XCTestCase {
         let changed = NSPredicate { _, _ in fixture.staticTexts["fixture.proof.row"].label != before }
         expectation(for: changed, evaluatedWith: nil)
         waitForExpectations(timeout: 5)
+        print("Synthetic scroll proof: \(before) -> \(fixture.staticTexts["fixture.proof.row"].label)")
 
         // A simulator has no private account or device data. Only activate Settings;
         // never tap a setting, sign in, grant permissions, or change configuration.
