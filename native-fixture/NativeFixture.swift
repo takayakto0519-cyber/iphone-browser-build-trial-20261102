@@ -8,7 +8,7 @@ struct NativeFixtureApp: App {
 struct NativeFixtureView: View {
     @State private var input = ""
     @State private var taps = 0
-    @State private var row: Int? = 0
+    @State private var row = 0
     @FocusState private var editing: Bool
 
     var body: some View {
@@ -19,7 +19,7 @@ struct NativeFixtureView: View {
             Text("Input: " + input).font(.caption)
                 .accessibilityIdentifier("fixture.proof.input")
             Text("Taps: \(taps)").accessibilityIdentifier("fixture.proof.taps")
-            Text("Row: \(row ?? 0)").accessibilityIdentifier("fixture.proof.row")
+            Text("Row: \(row)").accessibilityIdentifier("fixture.proof.row")
             TextField("Dummy input", text: $input)
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
@@ -35,9 +35,13 @@ struct NativeFixtureView: View {
                             .frame(maxWidth: .infinity, minHeight: 64)
                             .id(index)
                     }
-                }.scrollTargetLayout()
+                }
             }
-            .scrollPosition(id: $row, anchor: .top)
+            .onScrollGeometryChange(for: Int.self) { geometry in
+                Int(max(0, geometry.contentOffset.y) / 64)
+            } action: { _, visibleRow in
+                row = visibleRow
+            }
             .accessibilityIdentifier("fixture.scroll")
         }.padding()
     }
