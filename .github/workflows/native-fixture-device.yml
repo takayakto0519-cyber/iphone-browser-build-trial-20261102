@@ -1,0 +1,63 @@
+name: Unsigned native fixture for owner signing (not WDA)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: unsigned-native-fixture
+  cancel-in-progress: false
+jobs:
+  build:
+    if: ${{ github.event.repository.private == false }}
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Generate project with locked official XcodeGen
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip \
+            --output "$RUNNER_TEMP/xcodegen.zip"
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          ditto -x -k "$RUNNER_TEMP/xcodegen.zip" "$RUNNER_TEMP/xcodegen"
+          gen="$(find "$RUNNER_TEMP/xcodegen" -type f -name xcodegen | head -n 1)"
+          test -n "$gen"
+          chmod +x "$gen"
+          "$gen" generate --spec native-fixture/project.yml --project native-fixture
+      - name: Compile iPhone ARM64 application without any signing identity
+        run: |
+          set -euo pipefail
+          export DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -project native-fixture/NativeFixture.xcodeproj -scheme NativeFixture \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/native-device" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
+            build > "$RUNNER_TEMP/native-device-build.log" 2>&1 || {
+              tail -n 80 "$RUNNER_TEMP/native-device-build.log"
+              exit 1
+            }
+          app="$RUNNER_TEMP/native-device/Build/Products/Release-iphoneos/NativeFixture.app"
+          test -d "$app"
+          test -f "$app/NativeFixture"
+          test ! -e "$app/embedded.mobileprovision"
+          test ! -d "$app/_CodeSignature"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
+          file "$app/NativeFixture"
+          mkdir -p "$RUNNER_TEMP/native-package/Payload"
+          ditto "$app" "$RUNNER_TEMP/native-package/Payload/NativeFixture.app"
+          (cd "$RUNNER_TEMP/native-package" && zip -qr native-fixture-UNSIGNED.ipa Payload)
+          (cd "$RUNNER_TEMP/native-package" && shasum -a 256 native-fixture-UNSIGNED.ipa > native-fixture-UNSIGNED.ipa.sha256)
+          echo 'Unsigned native fixture only; NOT WDA; not installed or device verified.'
+      - name: Owner-only draft release; no Apple credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "native-fixture-unsigned-${GITHUB_RUN_ID}" --draft \
+            --title 'UNSIGNED native fixture; not WDA; not device verified' \
+            --notes 'Synthetic native input/scroll app. Built for iPhone ARM64 with signing disabled. Requires legitimate owner signing before installation. This is not WebDriverAgent and grants no cross-app control. No Apple credentials were used.' \
+            "$RUNNER_TEMP/native-package/native-fixture-UNSIGNED.ipa" \
+            "$RUNNER_TEMP/native-package/native-fixture-UNSIGNED.ipa.sha256"
